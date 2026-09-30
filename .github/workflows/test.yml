@@ -213,14 +213,14 @@ jobs:
           METRICS_RESP=$(curl -s -u "${SONAR_TOKEN}:" \
             "https://sonarcloud.io/api/measures/component?component=${PROJECT_KEY}&pullRequest=${PULL_REQUEST_KEY}&metricKeys=${METRIC_KEYS}")
 
-          # Extraer cada una con fallback si viene vacía o no hay suficiente código
-          NEW_ISSUES=$(echo "$METRICS_RESP" | jq -r '.component.measures[]? | select(.metric=="new_violations") | .period.value // "0"')
-          ACCEPTED_ISSUES=$(echo "$METRICS_RESP" | jq -r '.component.measures[]? | select(.metric=="new_accepted_issues") | .period.value // "0"')
-          COVERAGE=$(echo "$METRICS_RESP" | jq -r '.component.measures[]? | select(.metric=="new_coverage") | .period.value // "There are not enough lines to compute coverage"')
-          DUPLICATIONS=$(echo "$METRICS_RESP" | jq -r '.component.measures[]? | select(.metric=="new_duplicated_lines_density") | .period.value // "-"')
-          SECURITY_HOTSPOTS=$(echo "$METRICS_RESP" | jq -r '.component.measures[]? | select(.metric=="new_security_hotspots") | .period.value // "0"')
-          DEPENDENCY_RISKS=$(echo "$METRICS_RESP" | jq -r '.component.measures[]? | select(.metric=="software_quality_high_issues") | .period.value // "0"')
-
+          # Extraer cada una con fallback si viene vacía
+          NEW_ISSUES=$(echo "$METRICS_RESP" | jq -r '(.component.measures[]? | select(.metric=="new_violations") | .period.value // .value) // "0"')
+          ACCEPTED_ISSUES=$(echo "$METRICS_RESP" | jq -r '(.component.measures[]? | select(.metric=="new_accepted_issues") | .period.value // .value) // "0"')
+          COVERAGE=$(echo "$METRICS_RESP" | jq -r '(.component.measures[]? | select(.metric=="new_coverage") | .period.value // .value) // "N/A"')
+          DUPLICATIONS=$(echo "$METRICS_RESP" | jq -r '(.component.measures[]? | select(.metric=="new_duplicated_lines_density") | .period.value // .value) // "-"')
+          SECURITY_HOTSPOTS=$(echo "$METRICS_RESP" | jq -r '(.component.measures[]? | select(.metric=="new_security_hotspots") | .period.value // .value) // "0"')
+          DEPENDENCY_RISKS=$(echo "$METRICS_RESP" | jq -r '(.component.measures[]? | select(.metric=="software_quality_high_issues") | .period.value // .value) // "0"')
+          
           # Formatear porcentajes si son números
           if [[ "$COVERAGE" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
             COVERAGE="${COVERAGE}%"
@@ -237,8 +237,7 @@ jobs:
           echo "M_SECURITY_HOTSPOTS=${SECURITY_HOTSPOTS}" >> $GITHUB_ENV
           echo "M_DEPENDENCY_RISKS=${DEPENDENCY_RISKS}" >> $GITHUB_ENV
 
-      - name: Comment PR with Sonar Summary Table
-        if: always() && github.event_name == 'pull_request'
+      - name: Comment PR
         uses: thollander/actions-comment-pull-request@v2
         with:
           message: |
@@ -252,5 +251,7 @@ jobs:
             | 📋 **Duplications** | ${{ env.M_DUPLICATIONS }} |
             | 🔒 **Security Hotspots** | ${{ env.M_SECURITY_HOTSPOTS }} |
             | 📦 **Dependency Risks** | ${{ env.M_DEPENDENCY_RISKS }} |
-
           comment_tag: sonarqube_results
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          mode: upsert
+          create_if_not_exists: true
