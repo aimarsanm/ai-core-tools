@@ -167,7 +167,10 @@ jobs:
     name: SonarQube
     runs-on: ubuntu-latest
     needs: unit-tests
-
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
@@ -183,3 +186,74 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: >
+            -Dsonar.qualitygate.wait=true
+
+      - name: Fetch Sonar PR Summary Metrics
+        id: fetch_metrics
+        if: always() && github.event_name == 'pull_request'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          PROJECT_KEY: "lks-ot-i-plus-d_mattin-ai"
+          PULL_REQUEST_KEY: ${{ github.event.pull_request.number }}
+        run: |
+          # 1. Consultar estado del Quality Gate
+          QG_RESP=$(curl -s -u "${SONAR_TOKEN}:" \
+            "https://sonarcloud.io/api/qualitygates/project_status?projectKey=${PROJECT_KEY}&pullRequest=${PULL_REQUEST_KEY}")
+
+          STATUS=$(echo "$QG_RESP" | jq -r '.projectStatus.status // "UNKNOWN"')
+
+          if [ "$STATUS" == "OK" ]; then
+            echo "GATE_HEADER=✅ Quality Gate passed" >> $GITHUB_ENV
+          else
+            echo "GATE_HEADER=❌ Quality Gate failed" >> $GITHUB_ENV
+          fi
+
+          # 2. Consultar las 6 métricas del PR Summary
+          METRIC_KEYS="new_violations,new_accepted_issues,new_coverage,new_duplicated_lines_density,new_security_hotspots,software_quality_high_issues"
+          
+          METRICS_RESP=$(curl -s -u "${SONAR_TOKEN}:" \
+            "https://sonarcloud.io/api/measures/component?component=${PROJECT_KEY}&pullRequest=${PULL_REQUEST_KEY}&metricKeys=${METRIC_KEYS}")
+
+          # Extraer cada una con fallback si viene vacía o no hay suficiente código
+          NEW_ISSUES=$(echo "$METRICS_RESP" | jq -r '.component.measures[]? | select(.metric=="new_violations") | .period.value // "0"')
+          ACCEPTED_ISSUES=$(echo "$METRICS_RESP" | jq -r '.component.measures[]? | select(.metric=="new_accepted_issues") | .period.value // "0"')
+          COVERAGE=$(echo "$METRICS_RESP" | jq -r '.component.measures[]? | select(.metric=="new_coverage") | .period.value // "There are not enough lines to compute coverage"')
+          DUPLICATIONS=$(echo "$METRICS_RESP" | jq -r '.component.measures[]? | select(.metric=="new_duplicated_lines_density") | .period.value // "-"')
+          SECURITY_HOTSPOTS=$(echo "$METRICS_RESP" | jq -r '.component.measures[]? | select(.metric=="new_security_hotspots") | .period.value // "0"')
+          DEPENDENCY_RISKS=$(echo "$METRICS_RESP" | jq -r '.component.measures[]? | select(.metric=="software_quality_high_issues") | .period.value // "0"')
+
+          # Formatear porcentajes si son números
+          if [[ "$COVERAGE" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+            COVERAGE="${COVERAGE}%"
+          fi
+          if [[ "$DUPLICATIONS" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+            DUPLICATIONS="${DUPLICATIONS}%"
+          fi
+
+          # Pasar variables al entorno de GitHub Actions
+          echo "M_NEW_ISSUES=${NEW_ISSUES}" >> $GITHUB_ENV
+          echo "M_ACCEPTED_ISSUES=${ACCEPTED_ISSUES}" >> $GITHUB_ENV
+          echo "M_COVERAGE=${COVERAGE}" >> $GITHUB_ENV
+          echo "M_DUPLICATIONS=${DUPLICATIONS}" >> $GITHUB_ENV
+          echo "M_SECURITY_HOTSPOTS=${SECURITY_HOTSPOTS}" >> $GITHUB_ENV
+          echo "M_DEPENDENCY_RISKS=${DEPENDENCY_RISKS}" >> $GITHUB_ENV
+
+      - name: Comment PR with Sonar Summary Table
+        if: always() && github.event_name == 'pull_request'
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          message: |
+            ### ${{ env.GATE_HEADER }}
+
+            | Metric | Value |
+            | :--- | :--- |
+            | 🐞 **New Issues** | ${{ env.M_NEW_ISSUES }} |
+            | 👁️ **Accepted Issues** | ${{ env.M_ACCEPTED_ISSUES }} |
+            | 📊 **Coverage** | ${{ env.M_COVERAGE }} |
+            | 📋 **Duplications** | ${{ env.M_DUPLICATIONS }} |
+            | 🔒 **Security Hotspots** | ${{ env.M_SECURITY_HOTSPOTS }} |
+            | 📦 **Dependency Risks** | ${{ env.M_DEPENDENCY_RISKS }} |
+
+          comment_tag: sonarqube_results
