@@ -189,7 +189,7 @@ jobs:
         with:
           args: >
             -Dsonar.qualitygate.wait=true
-            
+
       - name: Load Sonar project key
         id: sonar_config
         shell: bash
@@ -272,7 +272,7 @@ jobs:
             | 🔒 **Security Hotspots** | ${{ env.M_SECURITY_HOTSPOTS }} |
             | 📦 **Dependency Risks** | ${{ env.M_DEPENDENCY_RISKS }} |
 
-            [Ver análisis de esta PR](https://sonarcloud.io/summary/new_code?id=$${{ steps.sonar_config.outputs.project_key }}&pullRequest=${{ github.event.pull_request.number }}) 
+            [Ver análisis de esta PR](https://sonarcloud.io/summary/new_code?id=${{ steps.sonar_config.outputs.project_key }}&pullRequest=${{ github.event.pull_request.number }}) 
           comment_tag: sonarqube_results
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           mode: upsert
