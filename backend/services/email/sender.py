@@ -105,3 +105,6 @@ class EmailSender(ABC):
     @abstractmethod
     def send(self, *, to: str, subject: str, body_html: str, body_text: str = "") -> None:
         print(f"Email -> to={to}, subject={subject!r}, body_html={body_html!r}, body_text={body_text!r}")
+    def send(self, *, to: str, subject: str, body_html: str, body_text: str = "") -> None:
+        print(f"Email -> to={to}, subject={subject!r}, body_html={body_html!r}, body_text={body_text!r}")
+       
