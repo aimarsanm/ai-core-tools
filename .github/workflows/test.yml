@@ -254,12 +254,9 @@ jobs:
             | 📋 **Duplications** | ${{ env.M_DUPLICATIONS }} |
             | 🔒 **Security Hotspots** | ${{ env.M_SECURITY_HOTSPOTS }} |
             | 📦 **Dependency Risks** | ${{ env.M_DEPENDENCY_RISKS }} |
-<<<<<<< HEAD
           comment_tag: sonarqube_results
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           mode: upsert
           create_if_not_exists: true
-=======
 
-          comment_tag: sonarqube_results
->>>>>>> 73823bd278bd1fc05acf752f27c62f6056aa1e3b
+          
