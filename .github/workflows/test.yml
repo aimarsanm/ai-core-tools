@@ -189,13 +189,26 @@ jobs:
         with:
           args: >
             -Dsonar.qualitygate.wait=true
+            
+      - name: Load Sonar project key
+        id: sonar_config
+        shell: bash
+        run: |
+         PROJECT_KEY=$(sed -n 's/^[[:space:]]*sonar\.projectKey[[:space:]]*=[[:space:]]*//p' sonar-project.properties | head -n 1)
+
+          if [ -z "$PROJECT_KEY" ]; then
+            echo "sonar.projectKey no está definido"
+            exit 1
+          fi
+
+          echo "project_key=$PROJECT_KEY" >> "$GITHUB_OUTPUT"
 
       - name: Fetch Sonar PR Summary Metrics
         id: fetch_metrics
         if: always() && github.event_name == 'pull_request'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          PROJECT_KEY: "lks-ot-i-plus-d_mattin-ai"
+          PROJECT_KEY: ${{ steps.sonar_config.outputs.project_key }}
           PULL_REQUEST_KEY: ${{ github.event.pull_request.number }}
         run: |
           # 1. Consultar estado del Quality Gate
@@ -258,6 +271,8 @@ jobs:
             | 📋 **Duplications** | ${{ env.M_DUPLICATIONS }} |
             | 🔒 **Security Hotspots** | ${{ env.M_SECURITY_HOTSPOTS }} |
             | 📦 **Dependency Risks** | ${{ env.M_DEPENDENCY_RISKS }} |
+
+            [Ver análisis de esta PR](https://sonarcloud.io/summary/new_code?id=$${{ steps.sonar_config.outputs.project_key }}&pullRequest=${{ github.event.pull_request.number }}) 
           comment_tag: sonarqube_results
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           mode: upsert
