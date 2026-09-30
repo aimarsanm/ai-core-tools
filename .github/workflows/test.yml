@@ -210,21 +210,21 @@ jobs:
             echo "GATE_HEADER=❌ Quality Gate failed" >> $GITHUB_ENV
           fi
 
-          # 2. Consultar las 6 métricas del PR Summary
+          # 2. Consultar las métricas de la PR
           METRIC_KEYS="new_violations,new_accepted_issues,new_coverage,new_duplicated_lines_density,new_security_hotspots,software_quality_high_issues"
           
           METRICS_RESP=$(curl -s -u "${SONAR_TOKEN}:" \
             "https://sonarcloud.io/api/measures/component?component=${PROJECT_KEY}&pullRequest=${PULL_REQUEST_KEY}&metricKeys=${METRIC_KEYS}")
 
-          # Extraer cada una con fallback si viene vacía
-          NEW_ISSUES=$(echo "$METRICS_RESP" | jq -r '(.component.measures[]? | select(.metric=="new_violations") | .period.value // .value) // "0"')
-          ACCEPTED_ISSUES=$(echo "$METRICS_RESP" | jq -r '(.component.measures[]? | select(.metric=="new_accepted_issues") | .period.value // .value) // "0"')
-          COVERAGE=$(echo "$METRICS_RESP" | jq -r '(.component.measures[]? | select(.metric=="new_coverage") | .period.value // .value) // "N/A"')
-          DUPLICATIONS=$(echo "$METRICS_RESP" | jq -r '(.component.measures[]? | select(.metric=="new_duplicated_lines_density") | .period.value // .value) // "-"')
-          SECURITY_HOTSPOTS=$(echo "$METRICS_RESP" | jq -r '(.component.measures[]? | select(.metric=="new_security_hotspots") | .period.value // .value) // "0"')
-          DEPENDENCY_RISKS=$(echo "$METRICS_RESP" | jq -r '(.component.measures[]? | select(.metric=="software_quality_high_issues") | .period.value // .value) // "0"')
+          # Extraer valores buscando en .periods[0].value (formato PR en SonarCloud) o .value
+          NEW_ISSUES=$(echo "$METRICS_RESP" | jq -r '(.component.measures[]? | select(.metric=="new_violations") | .periods[0].value // .value // .period.value) // "0"')
+          ACCEPTED_ISSUES=$(echo "$METRICS_RESP" | jq -r '(.component.measures[]? | select(.metric=="new_accepted_issues") | .periods[0].value // .value // .period.value) // "0"')
+          COVERAGE=$(echo "$METRICS_RESP" | jq -r '(.component.measures[]? | select(.metric=="new_coverage") | .periods[0].value // .value // .period.value) // "N/A"')
+          DUPLICATIONS=$(echo "$METRICS_RESP" | jq -r '(.component.measures[]? | select(.metric=="new_duplicated_lines_density") | .periods[0].value // .value // .period.value) // "-"')
+          SECURITY_HOTSPOTS=$(echo "$METRICS_RESP" | jq -r '(.component.measures[]? | select(.metric=="new_security_hotspots") | .periods[0].value // .value // .period.value) // "0"')
+          DEPENDENCY_RISKS=$(echo "$METRICS_RESP" | jq -r '(.component.measures[]? | select(.metric=="software_quality_high_issues") | .periods[0].value // .value // .period.value) // "0"')
           
-          # Formatear porcentajes si son números
+          # Formatear porcentajes si son números válidos
           if [[ "$COVERAGE" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
             COVERAGE="${COVERAGE}%"
           fi
@@ -232,7 +232,7 @@ jobs:
             DUPLICATIONS="${DUPLICATIONS}%"
           fi
 
-          # Pasar variables al entorno de GitHub Actions
+          # Exportar a $GITHUB_ENV
           echo "M_NEW_ISSUES=${NEW_ISSUES}" >> $GITHUB_ENV
           echo "M_ACCEPTED_ISSUES=${ACCEPTED_ISSUES}" >> $GITHUB_ENV
           echo "M_COVERAGE=${COVERAGE}" >> $GITHUB_ENV
