@@ -211,7 +211,7 @@ jobs:
           fi
 
           # 2. Consultar las métricas de la PR
-          METRIC_KEYS="new_violations,new_accepted_issues,new_coverage,new_duplicated_lines_density,new_security_hotspots,new_bugs,new_vulnerabilities,new_code_smells"
+          METRIC_KEYS="new_violations,new_accepted_issues,new_coverage,new_duplicated_lines_density,new_security_hotspots,new_vulnerabilities"
           
           METRICS_RESP=$(curl -s -u "${SONAR_TOKEN}:" \
             "https://sonarcloud.io/api/measures/component?component=${PROJECT_KEY}&pullRequest=${PULL_REQUEST_KEY}&metricKeys=${METRIC_KEYS}")
@@ -226,7 +226,7 @@ jobs:
           COVERAGE=$(echo "$METRICS_RESP" | jq -r '.component.measures[]? | select(.metric=="new_coverage") | .period.value // .periods[0].value // .value // "N/A"')
           DUPLICATIONS=$(echo "$METRICS_RESP" | jq -r '.component.measures[]? | select(.metric=="new_duplicated_lines_density") | .period.value // .periods[0].value // .value // "-"')
           SECURITY_HOTSPOTS=$(echo "$METRICS_RESP" | jq -r '.component.measures[]? | select(.metric=="new_security_hotspots") | .period.value // .periods[0].value // .value // "0"')
-          DEPENDENCY_RISKS=$(echo "$METRICS_RESP" | jq -r '.component.measures[]? | select(.metric=="software_quality_high_issues") | .period.value // .periods[0].value // .value // "0"')
+          DEPENDENCY_RISKS=$(echo "$METRICS_RESP" | jq -r '.component.measures[]? | select(.metric=="new_vulnerabilities") | .period.value // .periods[0].value // .value // "0"')
           
           # Formatear porcentajes si son números válidos
           if [[ "$COVERAGE" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
